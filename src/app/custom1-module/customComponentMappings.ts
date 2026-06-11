@@ -3,6 +3,7 @@ import { SelfCollectionQrComponent } from '../self-collection-qr/self-collection
 export const REQUESTS_TAB_SELECTORS = [
   'nde-requests',
   'nde-requests-after',
+  'nde-record-actions-bottom',
 ];
 
 export const selectorComponentMap = new Map<string, any>([

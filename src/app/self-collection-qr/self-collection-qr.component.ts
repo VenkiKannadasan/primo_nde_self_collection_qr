@@ -86,10 +86,14 @@ const DEFAULT_ELIGIBLE_STATUSES = [
   'Ready for Pick Up',
   'Ready for Collection',
 ];
-const DEFAULT_ROW_SELECTOR = [
+const SEMANTIC_REQUEST_ROW_SELECTORS = [
   'nde-request-item',
   'prm-request-item',
   '.request-item-container',
+  '[data-qa="requests-item"]',
+];
+const DEFAULT_ROW_SELECTOR = [
+  ...SEMANTIC_REQUEST_ROW_SELECTORS,
   'md-list-item',
   'mat-expansion-panel',
   '.mat-expansion-panel',
@@ -162,6 +166,10 @@ export class SelfCollectionQrComponent implements OnDestroy {
   }
 
   get sectionRequests(): SelfCollectionRequest[] {
+    if (this.config.placement !== 'section' && this.findContainingRequestRow()) {
+      return [];
+    }
+
     if (this.config.placement === 'section' || this.config.placement === 'both') {
       return this.qrRequests;
     }
@@ -1022,8 +1030,7 @@ export class SelfCollectionQrComponent implements OnDestroy {
       return;
     }
 
-    const target = this.document.querySelector(this.config.observerSelector)
-      ?? this.elementRef.nativeElement.parentElement;
+    const target = this.findRequestsRoot();
 
     if (!target) {
       return;
@@ -1110,6 +1117,12 @@ export class SelfCollectionQrComponent implements OnDestroy {
   }
 
   private findRequestsRoot(): HTMLElement | null {
+    const containingRequestRow = this.findContainingRequestRow();
+
+    if (containingRequestRow) {
+      return containingRequestRow;
+    }
+
     const configuredRoot = this.document.querySelector(this.config.observerSelector);
 
     if (configuredRoot instanceof HTMLElement) {
@@ -1215,7 +1228,7 @@ export class SelfCollectionQrComponent implements OnDestroy {
 
       if (
         selectorMatch instanceof HTMLElement
-        && selectorMatch !== root
+        && (selectorMatch !== root || this.isSemanticRequestRow(root))
         && root.contains(selectorMatch)
         && !this.elementRef.nativeElement.contains(selectorMatch)
       ) {
@@ -1241,19 +1254,12 @@ export class SelfCollectionQrComponent implements OnDestroy {
   }
 
   private findSemanticRequestRow(candidate: HTMLElement, root: HTMLElement): HTMLElement | null {
-    const selectors = [
-      'nde-request-item',
-      'prm-request-item',
-      '.request-item-container',
-      '[data-qa="requests-item"]',
-    ];
-
-    for (const selector of selectors) {
+    for (const selector of SEMANTIC_REQUEST_ROW_SELECTORS) {
       const row = candidate.closest(selector);
 
       if (
         row instanceof HTMLElement
-        && row !== root
+        && (row !== root || this.isSemanticRequestRow(root))
         && root.contains(row)
         && !this.elementRef.nativeElement.contains(row)
       ) {
@@ -1262,6 +1268,22 @@ export class SelfCollectionQrComponent implements OnDestroy {
     }
 
     return null;
+  }
+
+  private findContainingRequestRow(): HTMLElement | null {
+    for (const selector of SEMANTIC_REQUEST_ROW_SELECTORS) {
+      const row = this.elementRef.nativeElement.closest(selector);
+
+      if (row instanceof HTMLElement) {
+        return row;
+      }
+    }
+
+    return null;
+  }
+
+  private isSemanticRequestRow(element: HTMLElement): boolean {
+    return SEMANTIC_REQUEST_ROW_SELECTORS.some(selector => element.matches(selector));
   }
 
   private findActionAnchor(row: HTMLElement): HTMLElement | null {

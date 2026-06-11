@@ -172,6 +172,65 @@ describe('SelfCollectionQrComponent', () => {
     discardPeriodicTasks();
   }));
 
+  it('places an inline QR when mounted in the NDE record actions hook', fakeAsync(() => {
+    const requestsRoot = document.createElement('nde-requests');
+    requestsRoot.innerHTML = `
+      <nde-request-item class="width-100 flex-column">
+        <div class="request-item-container flex-row flex-layout-space-between margin-top-medium">
+          <div class="request-info flex-column flex-layout-start-start">
+            <div class="request-title">
+              <a data-qa="requests-item-title" href="/nde/fulldisplay?docid=alma9910014014807171">
+                Decision analytics : Microsoft Excel / Conrad Carlberg. (PBK.)
+              </a>
+            </div>
+            <div data-qa="requests-item-status-indication" class="status-line margin-top-medium">
+              <span>Request</span><span>. On Hold Shelf until 22/06/2026</span>
+            </div>
+            <div>
+              <div>
+                <div class="margin-top-medium" data-qa="requests-expanded-item-request.bookings.request_id">
+                  <span class="field-title">Request Id:</span> 2207101260008082
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="flex-column flex-layout-space-between">
+            <div class="request-actions flex-row flex-layout-start-start">
+              <nde-record-actions-bottom></nde-record-actions-bottom>
+            </div>
+          </div>
+        </div>
+        <div class="flex-row flex-layout-space-between width-100">
+          <button data-qa="request-item-cancel-btn" aria-label="Cancel request Decision analytics : Microsoft Excel / Conrad Carlberg. (PBK.)">
+            <span class="mdc-button__label">Cancel</span>
+          </button>
+          <div class="margin-start-auto">
+            <button data-qa="request-expand-collapse-item-btn" aria-expanded="true"></button>
+          </div>
+        </div>
+      </nde-request-item>
+    `;
+    document.body.appendChild(requestsRoot);
+
+    const actionsHook = requestsRoot.querySelector('nde-record-actions-bottom') as HTMLElement;
+    actionsHook.appendChild(fixture.nativeElement);
+
+    component.hostComponent = {};
+    fixture.detectChanges();
+    tick(150);
+    fixture.detectChanges();
+
+    const inlineQr = requestsRoot.querySelector('.self-collection-qr-inline') as HTMLButtonElement | null;
+    const sectionFallback = fixture.nativeElement.querySelector('.self-collection-qr');
+
+    expect(inlineQr).not.toBeNull();
+    expect(inlineQr?.dataset['requestId']).toBe('2207101260008082');
+    expect(inlineQr?.parentElement?.querySelector('[data-qa="request-item-cancel-btn"]')).not.toBeNull();
+    expect(sectionFallback).toBeNull();
+
+    discardPeriodicTasks();
+  }));
+
   it('accepts Alma object parameters when they arrive as a key-value string', () => {
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({

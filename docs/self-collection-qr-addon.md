@@ -7,7 +7,7 @@ This add-on recreates the previous Primo behavior for self-collection locker QR 
 - Reads the host Requests component through the NDE `hostComponent` input.
 - Filters requests whose status contains a ready-for-collection label such as `On Hold Shelf`, `Available for Pickup`, or `Ready for Collection`.
 - Builds the locker service image URL with query parameters `a`, `b`, and `c`, where `c` is the Primo request ID.
-- Places the QR code inline on the matching request row when the NDE markup exposes a row anchor.
+- Places the QR code inline on the matching request row when NDE invokes the request actions hook or exposes a row anchor.
 - Shows a fallback QR card per eligible request if the inline row cannot be found.
 
 ## Alma Add-On Parameters
@@ -29,7 +29,7 @@ Keep locker service secrets in Alma add-on configuration, not in source control.
 }
 ```
 
-If the NDE Requests customization hook differs in a tenant, update `REQUESTS_TAB_SELECTORS` in `src/app/custom1-module/customComponentMappings.ts`.
+If the NDE Requests customization hook differs in a tenant, update `REQUESTS_TAB_SELECTORS` in `src/app/custom1-module/customComponentMappings.ts`. Current testing has shown NDE requesting `nde-record-actions-bottom` for the Requests row action area.
 
 If the NDE request row markup differs, keep the add-on hook as-is and override `rowSelector` in Alma parameters with a selector that matches one request row.
 

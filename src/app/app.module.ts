@@ -30,6 +30,7 @@ export const AppModule = ({providers, shellRouter}: {providers:any, shellRouter:
   })
   class AppModule implements DoBootstrap{
     private webComponentSelectorMap = new Map<string,  NgElementConstructor<unknown>>();
+    private loggedComponentRefNames = new Set<string>();
 
     constructor(private injector: Injector, private router: Router) {
       router.dispose(); //this prevents the router from being initialized and interfering with the shell app router
@@ -51,11 +52,12 @@ export const AppModule = ({providers, shellRouter}: {providers:any, shellRouter:
     public getComponentRef(componentName:string) {
       const componentRef = this.webComponentSelectorMap.get(componentName);
 
-      console.info('[SelfCollectionQr] getComponentRef', {
-        componentName,
-        found: Boolean(componentRef),
-        registeredSelectors: Array.from(this.webComponentSelectorMap.keys()),
-      });
+      if (componentRef || !this.loggedComponentRefNames.has(componentName)) {
+        this.loggedComponentRefNames.add(componentName);
+        console.info(
+          `[SelfCollectionQr] getComponentRef componentName=${componentName} found=${Boolean(componentRef)} registered=${Array.from(this.webComponentSelectorMap.keys()).join(',')}`,
+        );
+      }
 
       return componentRef;
     }
