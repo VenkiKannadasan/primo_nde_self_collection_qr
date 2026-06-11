@@ -12,35 +12,36 @@ import {
 } from '@angular/core';
 
 interface RawSelfCollectionQrConfig {
-  enabled?: boolean;
-  debug?: boolean;
-  placement?: SelfCollectionQrPlacement;
-  showSectionFallback?: boolean;
-  serviceUrl?: string;
-  qrUrlTemplate?: string;
-  queryParamA?: string;
-  queryParamB?: string;
-  queryparamA?: string;
-  queryparamB?: string;
-  a?: string;
-  b?: string;
-  paramAName?: string;
-  paramBName?: string;
-  requestIdParamName?: string;
-  eligibleStatus?: string;
-  eligibleStatuses?: string[];
-  heading?: string;
-  subheading?: string;
-  imageAlt?: string;
-  unavailableText?: string;
-  observerSelector?: string;
-  rowSelector?: string;
-  refreshIntervalMs?: number;
-  crossOrigin?: '' | 'anonymous' | 'use-credentials';
+  [key: string]: unknown;
+  enabled?: unknown;
+  debug?: unknown;
+  placement?: unknown;
+  showSectionFallback?: unknown;
+  serviceUrl?: unknown;
+  qrUrlTemplate?: unknown;
+  queryParamA?: unknown;
+  queryParamB?: unknown;
+  queryparamA?: unknown;
+  queryparamB?: unknown;
+  a?: unknown;
+  b?: unknown;
+  paramAName?: unknown;
+  paramBName?: unknown;
+  requestIdParamName?: unknown;
+  eligibleStatus?: unknown;
+  eligibleStatuses?: unknown;
+  heading?: unknown;
+  subheading?: unknown;
+  imageAlt?: unknown;
+  unavailableText?: unknown;
+  observerSelector?: unknown;
+  rowSelector?: unknown;
+  refreshIntervalMs?: unknown;
+  crossOrigin?: unknown;
 }
 
 interface SelfCollectionQrModuleParameters extends RawSelfCollectionQrConfig {
-  selfCollectionQr?: RawSelfCollectionQrConfig;
+  selfCollectionQr?: RawSelfCollectionQrConfig | string;
 }
 
 interface SelfCollectionQrConfig {
@@ -206,33 +207,302 @@ export class SelfCollectionQrComponent implements OnDestroy {
   }
 
   private buildConfig(moduleParameters: SelfCollectionQrModuleParameters | null): SelfCollectionQrConfig {
-    const raw = moduleParameters?.selfCollectionQr ?? moduleParameters ?? {};
-    const eligibleStatuses = raw.eligibleStatuses?.length
-      ? raw.eligibleStatuses
-      : [raw.eligibleStatus ?? DEFAULT_ELIGIBLE_STATUSES].flat();
+    const raw = this.normaliseRawConfig(moduleParameters?.selfCollectionQr ?? moduleParameters ?? {});
+    const eligibleStatuses = this.readStringList(
+      raw.eligibleStatuses ?? raw.eligibleStatus,
+      DEFAULT_ELIGIBLE_STATUSES,
+    );
 
     return {
-      enabled: raw.enabled ?? true,
-      debug: raw.debug ?? false,
-      placement: raw.placement ?? 'inline',
-      showSectionFallback: raw.showSectionFallback ?? true,
-      serviceUrl: raw.serviceUrl ?? DEFAULT_SERVICE_URL,
-      qrUrlTemplate: raw.qrUrlTemplate ?? '',
-      queryParamA: raw.queryParamA ?? raw.queryparamA ?? raw.a ?? '',
-      queryParamB: raw.queryParamB ?? raw.queryparamB ?? raw.b ?? '',
-      paramAName: raw.paramAName ?? 'a',
-      paramBName: raw.paramBName ?? 'b',
-      requestIdParamName: raw.requestIdParamName ?? 'c',
-      eligibleStatuses: eligibleStatuses.map(status => status.trim()).filter(status => status.length > 0),
-      heading: raw.heading ?? 'Self-collection QR',
-      subheading: raw.subheading ?? 'Scan at the self-collection kiosk.',
-      imageAlt: raw.imageAlt ?? 'Self-collection QR code',
-      unavailableText: raw.unavailableText ?? 'QR unavailable',
-      observerSelector: raw.observerSelector ?? 'nde-requests, prm-requests',
-      rowSelector: raw.rowSelector ?? DEFAULT_ROW_SELECTOR,
-      refreshIntervalMs: Math.max(raw.refreshIntervalMs ?? 1000, 250),
-      crossOrigin: raw.crossOrigin ?? 'anonymous',
+      enabled: this.readBoolean(raw.enabled, true),
+      debug: this.readBoolean(raw.debug, false),
+      placement: this.readPlacement(raw.placement, 'inline'),
+      showSectionFallback: this.readBoolean(raw.showSectionFallback, true),
+      serviceUrl: this.readString(raw.serviceUrl, DEFAULT_SERVICE_URL),
+      qrUrlTemplate: this.readString(raw.qrUrlTemplate, ''),
+      queryParamA: this.readString(raw.queryParamA ?? raw.queryparamA ?? raw.a, ''),
+      queryParamB: this.readString(raw.queryParamB ?? raw.queryparamB ?? raw.b, ''),
+      paramAName: this.readString(raw.paramAName, 'a'),
+      paramBName: this.readString(raw.paramBName, 'b'),
+      requestIdParamName: this.readString(raw.requestIdParamName, 'c'),
+      eligibleStatuses,
+      heading: this.readString(raw.heading, 'Self-collection QR'),
+      subheading: this.readString(raw.subheading, 'Scan at the self-collection kiosk.'),
+      imageAlt: this.readString(raw.imageAlt, 'Self-collection QR code'),
+      unavailableText: this.readString(raw.unavailableText, 'QR unavailable'),
+      observerSelector: this.readString(raw.observerSelector, 'nde-requests, prm-requests'),
+      rowSelector: this.readString(raw.rowSelector, DEFAULT_ROW_SELECTOR),
+      refreshIntervalMs: Math.max(this.readNumber(raw.refreshIntervalMs, 1000), 250),
+      crossOrigin: this.readCrossOrigin(raw.crossOrigin, 'anonymous'),
     };
+  }
+
+  private normaliseRawConfig(value: unknown): RawSelfCollectionQrConfig {
+    if (typeof value === 'string') {
+      return this.parseConfigString(value);
+    }
+
+    if (!this.isRecord(value)) {
+      return {};
+    }
+
+    const config: RawSelfCollectionQrConfig = {};
+
+    for (const [key, entryValue] of Object.entries(value)) {
+      config[key] = typeof entryValue === 'string'
+        ? this.parseConfigScalar(entryValue)
+        : entryValue;
+    }
+
+    return config;
+  }
+
+  private parseConfigString(value: string): RawSelfCollectionQrConfig {
+    const trimmed = value.trim();
+
+    if (!trimmed) {
+      return {};
+    }
+
+    try {
+      const parsed = JSON.parse(trimmed);
+
+      if (this.isRecord(parsed)) {
+        return this.normaliseRawConfig(parsed);
+      }
+    } catch {
+      // Alma Add-On Configuration can pass object parameters as "{key=value}" strings.
+    }
+
+    const body = trimmed.startsWith('{') && trimmed.endsWith('}')
+      ? trimmed.slice(1, -1)
+      : trimmed;
+    const config: RawSelfCollectionQrConfig = {};
+
+    for (const part of this.splitTopLevel(body, ',')) {
+      const separatorIndex = this.findTopLevelSeparator(part, '=');
+
+      if (separatorIndex < 0) {
+        continue;
+      }
+
+      const key = part.slice(0, separatorIndex).trim();
+      const entryValue = part.slice(separatorIndex + 1).trim();
+
+      if (key) {
+        config[key] = this.parseConfigScalar(entryValue);
+      }
+    }
+
+    return config;
+  }
+
+  private parseConfigScalar(value: string): unknown {
+    const trimmed = this.stripMatchingQuotes(value.trim());
+
+    if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+      return this.splitTopLevel(trimmed.slice(1, -1), ',')
+        .map(item => this.stripMatchingQuotes(item.trim()))
+        .filter(item => item.length > 0);
+    }
+
+    if (/^true$/i.test(trimmed)) {
+      return true;
+    }
+
+    if (/^false$/i.test(trimmed)) {
+      return false;
+    }
+
+    if (/^-?\d+(\.\d+)?$/.test(trimmed)) {
+      return Number(trimmed);
+    }
+
+    return trimmed;
+  }
+
+  private splitTopLevel(value: string, separator: string): string[] {
+    const parts: string[] = [];
+    let start = 0;
+    let squareDepth = 0;
+    let curlyDepth = 0;
+    let quote: string | null = null;
+
+    for (let index = 0; index < value.length; index += 1) {
+      const character = value[index];
+      const previous = index > 0 ? value[index - 1] : '';
+
+      if (quote) {
+        if (character === quote && previous !== '\\') {
+          quote = null;
+        }
+
+        continue;
+      }
+
+      if (character === '"' || character === "'") {
+        quote = character;
+        continue;
+      }
+
+      if (character === '[') {
+        squareDepth += 1;
+        continue;
+      }
+
+      if (character === ']') {
+        squareDepth = Math.max(squareDepth - 1, 0);
+        continue;
+      }
+
+      if (character === '{') {
+        curlyDepth += 1;
+        continue;
+      }
+
+      if (character === '}') {
+        curlyDepth = Math.max(curlyDepth - 1, 0);
+        continue;
+      }
+
+      if (character === separator && squareDepth === 0 && curlyDepth === 0) {
+        parts.push(value.slice(start, index));
+        start = index + 1;
+      }
+    }
+
+    parts.push(value.slice(start));
+
+    return parts;
+  }
+
+  private findTopLevelSeparator(value: string, separator: string): number {
+    let squareDepth = 0;
+    let curlyDepth = 0;
+    let quote: string | null = null;
+
+    for (let index = 0; index < value.length; index += 1) {
+      const character = value[index];
+      const previous = index > 0 ? value[index - 1] : '';
+
+      if (quote) {
+        if (character === quote && previous !== '\\') {
+          quote = null;
+        }
+
+        continue;
+      }
+
+      if (character === '"' || character === "'") {
+        quote = character;
+        continue;
+      }
+
+      if (character === '[') {
+        squareDepth += 1;
+        continue;
+      }
+
+      if (character === ']') {
+        squareDepth = Math.max(squareDepth - 1, 0);
+        continue;
+      }
+
+      if (character === '{') {
+        curlyDepth += 1;
+        continue;
+      }
+
+      if (character === '}') {
+        curlyDepth = Math.max(curlyDepth - 1, 0);
+        continue;
+      }
+
+      if (character === separator && squareDepth === 0 && curlyDepth === 0) {
+        return index;
+      }
+    }
+
+    return -1;
+  }
+
+  private stripMatchingQuotes(value: string): string {
+    if (
+      (value.startsWith('"') && value.endsWith('"'))
+      || (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      return value.slice(1, -1);
+    }
+
+    return value;
+  }
+
+  private readString(value: unknown, fallback: string): string {
+    const text = this.scalarValueToText(value).trim();
+
+    return text.length > 0 ? text : fallback;
+  }
+
+  private readBoolean(value: unknown, fallback: boolean): boolean {
+    if (typeof value === 'boolean') {
+      return value;
+    }
+
+    if (typeof value === 'string') {
+      if (/^true$/i.test(value.trim())) {
+        return true;
+      }
+
+      if (/^false$/i.test(value.trim())) {
+        return false;
+      }
+    }
+
+    return fallback;
+  }
+
+  private readNumber(value: unknown, fallback: number): number {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return value;
+    }
+
+    if (typeof value === 'string') {
+      const parsed = Number(value);
+
+      if (Number.isFinite(parsed)) {
+        return parsed;
+      }
+    }
+
+    return fallback;
+  }
+
+  private readStringList(value: unknown, fallback: string[]): string[] {
+    const values = Array.isArray(value) ? value : [value ?? fallback].flat();
+
+    return values
+      .flatMap(entry => this.scalarValueToText(entry).split(','))
+      .map(status => status.trim())
+      .filter(status => status.length > 0);
+  }
+
+  private readPlacement(value: unknown, fallback: SelfCollectionQrPlacement): SelfCollectionQrPlacement {
+    const placement = this.scalarValueToText(value).trim();
+
+    return placement === 'inline' || placement === 'section' || placement === 'both'
+      ? placement
+      : fallback;
+  }
+
+  private readCrossOrigin(
+    value: unknown,
+    fallback: '' | 'anonymous' | 'use-credentials',
+  ): '' | 'anonymous' | 'use-credentials' {
+    const crossOrigin = this.scalarValueToText(value).trim();
+
+    return crossOrigin === '' || crossOrigin === 'anonymous' || crossOrigin === 'use-credentials'
+      ? crossOrigin
+      : fallback;
   }
 
   private isConfigured(): boolean {

@@ -111,6 +111,53 @@ describe('SelfCollectionQrComponent', () => {
     expect(qrImage?.src).toContain('c=2207101260008082');
   });
 
+  it('accepts Alma object parameters when they arrive as a key-value string', () => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      declarations: [SelfCollectionQrComponent],
+      providers: [
+        {
+          provide: 'MODULE_PARAMETERS',
+          useValue: {
+            selfCollectionQr: '{qrUrlTemplate=https://api.qrserver.com/v1/create-qr-code/?size=220x220&data={requestId}, eligibleStatuses=[On Hold Shelf], debug=true}',
+          },
+        },
+      ],
+    });
+
+    const stringConfigFixture = TestBed.createComponent(SelfCollectionQrComponent);
+    const stringConfigComponent = stringConfigFixture.componentInstance;
+
+    stringConfigComponent.hostComponent = {
+      requestsService: {
+        requestsDisplay: [
+          {
+            requestId: '2207101260008082',
+            title: 'Decision analytics',
+            status: 'Request. On Hold Shelf until 22/06/2026',
+          },
+          {
+            requestId: '2207101260008083',
+            title: 'Still pending',
+            status: 'Request. In Process',
+          },
+        ],
+      },
+    };
+
+    stringConfigFixture.detectChanges();
+
+    const compiled = stringConfigFixture.nativeElement as HTMLElement;
+    const qrImage = compiled.querySelector('.self-collection-qr__image') as HTMLImageElement | null;
+
+    expect(compiled.textContent).toContain('Decision analytics');
+    expect(compiled.textContent).not.toContain('Still pending');
+    expect(qrImage?.src).toContain('api.qrserver.com/v1/create-qr-code/');
+    expect(qrImage?.src).toContain('data=2207101260008082');
+
+    stringConfigFixture.destroy();
+  });
+
   it('does not render QR codes from an expanded NDE request row while it is in process', () => {
     const requestsRoot = document.createElement('nde-requests');
     requestsRoot.innerHTML = `

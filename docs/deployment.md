@@ -30,6 +30,8 @@ For placeholder QR testing:
 }
 ```
 
+Alma may display the nested `selfCollectionQr` object as a single string such as `{qrUrlTemplate=..., eligibleStatuses=[On Hold Shelf], debug=true}` in the browser console. The add-on supports that serialized form as well as normal JSON-style objects.
+
 Remove `"debug": true` after testing. When enabled, the browser console logs the host component keys, request extraction counts, and matched request IDs without printing locker tokens.
 
 For production locker QR codes:
