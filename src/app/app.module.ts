@@ -40,6 +40,8 @@ export const AppModule = ({providers, shellRouter}: {providers:any, shellRouter:
         const customElement = createCustomElement(value, {injector: this.injector});
         this.webComponentSelectorMap.set(key, customElement);
       }
+
+      console.info('[SelfCollectionQr] registered NDE selectors', Array.from(this.webComponentSelectorMap.keys()));
     }
 
     /**
@@ -47,7 +49,15 @@ export const AppModule = ({providers, shellRouter}: {providers:any, shellRouter:
      * @param componentName
      */
     public getComponentRef(componentName:string) {
-      return this.webComponentSelectorMap.get(componentName);
+      const componentRef = this.webComponentSelectorMap.get(componentName);
+
+      console.info('[SelfCollectionQr] getComponentRef', {
+        componentName,
+        found: Boolean(componentRef),
+        registeredSelectors: Array.from(this.webComponentSelectorMap.keys()),
+      });
+
+      return componentRef;
     }
   }
   return AppModule
