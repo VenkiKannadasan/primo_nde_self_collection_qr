@@ -165,6 +165,18 @@ export class SelfCollectionQrComponent implements OnDestroy {
     return this.config.enabled && this.isConfigured() && this.sectionRequests.length > 0;
   }
 
+  get shouldRenderAction(): boolean {
+    return this.config.enabled && this.isConfigured() && this.actionRequests.length > 0;
+  }
+
+  get actionRequests(): SelfCollectionRequest[] {
+    if (this.config.placement === 'section' || !this.findContainingRequestRow()) {
+      return [];
+    }
+
+    return this.qrRequests;
+  }
+
   get sectionRequests(): SelfCollectionRequest[] {
     if (this.config.placement !== 'section' && this.findContainingRequestRow()) {
       return [];
@@ -640,20 +652,57 @@ export class SelfCollectionQrComponent implements OnDestroy {
   }
 
   private extractRequests(host: unknown): unknown[] {
+    const directRequestObjects = this.readDirectRequestObjects(host);
     const directRequestArrays = this.readDirectRequestArrays(host);
+    const hostRequests = [
+      ...directRequestObjects,
+      ...directRequestArrays,
+    ];
+
+    if (hostRequests.length > 0) {
+      return hostRequests;
+    }
+
+    const recursiveRequestObjects = this.findRequestObjects(host, 0, new WeakSet<object>(), []);
     const domRequests = this.extractRequestsFromDom();
-    const recursiveRequestArrays = directRequestArrays.length > 0
+    const recursiveRequestArrays = recursiveRequestObjects.length > 0
       ? []
       : this.findRequestArrays(host, 0, new WeakSet<object>(), []);
 
-    if (directRequestArrays.length > 0) {
-      return [...directRequestArrays, ...domRequests];
+    if (recursiveRequestObjects.length > 0) {
+      return recursiveRequestObjects;
     }
 
     return [
       ...recursiveRequestArrays.flat(),
       ...domRequests,
     ];
+  }
+
+  private readDirectRequestObjects(host: unknown): unknown[] {
+    const directPaths = [
+      [],
+      ['request'],
+      ['requestItem'],
+      ['request_item'],
+      ['requestData'],
+      ['requestDetails'],
+      ['item'],
+      ['record'],
+      ['data'],
+      ['source'],
+    ];
+    const requests: unknown[] = [];
+
+    for (const path of directPaths) {
+      const value = path.length === 0 ? host : this.readPath(host, path);
+
+      if (this.canNormaliseAsRequest(value)) {
+        requests.push(value);
+      }
+    }
+
+    return requests;
   }
 
   private readDirectRequestArrays(host: unknown): unknown[] {
@@ -677,6 +726,10 @@ export class SelfCollectionQrComponent implements OnDestroy {
     }
 
     return [];
+  }
+
+  private canNormaliseAsRequest(value: unknown): boolean {
+    return this.normaliseRequest(value) !== null;
   }
 
   private extractRequestsFromDom(): unknown[] {
@@ -869,6 +922,48 @@ export class SelfCollectionQrComponent implements OnDestroy {
     return arrays;
   }
 
+  private findRequestObjects(
+    source: unknown,
+    depth: number,
+    seen: WeakSet<object>,
+    requests: unknown[],
+  ): unknown[] {
+    if (!this.isRecord(source) || depth >= 4 || requests.length >= 10) {
+      return requests;
+    }
+
+    const sourceObject = source as object;
+
+    if (seen.has(sourceObject)) {
+      return requests;
+    }
+
+    seen.add(sourceObject);
+
+    if (this.canNormaliseAsRequest(source)) {
+      requests.push(source);
+      return requests;
+    }
+
+    for (const key of Object.keys(source).slice(0, 80)) {
+      if (this.shouldSkipRecursiveKey(key)) {
+        continue;
+      }
+
+      let child: unknown;
+
+      try {
+        child = source[key];
+      } catch {
+        continue;
+      }
+
+      this.findRequestObjects(child, depth + 1, seen, requests);
+    }
+
+    return requests;
+  }
+
   private shouldSkipRecursiveKey(key: string): boolean {
     return key === '__ngContext__'
       || key === 'router'
@@ -1050,6 +1145,10 @@ export class SelfCollectionQrComponent implements OnDestroy {
 
   private scheduleInlinePlacement(): void {
     if (this.config.placement === 'section' || !this.config.enabled || !this.isConfigured()) {
+      return;
+    }
+
+    if (this.findContainingRequestRow()) {
       return;
     }
 
@@ -1446,10 +1545,13 @@ export class SelfCollectionQrComponent implements OnDestroy {
     }
 
     this.lastHostDebugSignature = signature;
-    this.debugLog('host component data candidates', {
-      hostKeys: this.describeKeys(host),
-      candidates,
-    });
+    this.debugLog(
+      `host component data candidates hostKeys=${this.describeKeys(host).join(',')} candidates=${candidates.map(candidate => candidate['path']).join(',') || 'none'}`,
+      {
+        hostKeys: this.describeKeys(host),
+        candidates,
+      },
+    );
   }
 
   private collectHostArrayCandidates(host: unknown): Array<Record<string, unknown>> {
@@ -1578,10 +1680,13 @@ export class SelfCollectionQrComponent implements OnDestroy {
     }
 
     this.lastInlinePlacementDebugSignature = signature;
-    this.debugLog('inline placement', {
-      placedRequestIds: Array.from(placedRequestIds),
-      missingRequestIds,
-    });
+    this.debugLog(
+      `inline placement placed=${Array.from(placedRequestIds).join(',') || 'none'} missing=${missingRequestIds.join(',') || 'none'}`,
+      {
+        placedRequestIds: Array.from(placedRequestIds),
+        missingRequestIds,
+      },
+    );
   }
 
   private debugRequestExtraction(
@@ -1606,17 +1711,27 @@ export class SelfCollectionQrComponent implements OnDestroy {
     }
 
     this.lastDebugSignature = debugSignature;
-    this.debugLog('request extraction', {
-      isConfigured: this.isConfigured(),
-      rawRequestCount: extractedRequests.length,
-      qrRequestCount: qrRequests.length,
-      hostKeys: this.describeKeys(this.host),
-      qrRequests: qrRequests.map(request => ({
-        requestId: request.requestId,
-        title: request.title,
-        status: request.status,
-      })),
-    });
+    this.debugLog(
+      [
+        'request extraction',
+        `isConfigured=${this.isConfigured()}`,
+        `rawRequestCount=${extractedRequests.length}`,
+        `qrRequestCount=${qrRequests.length}`,
+        `requestIds=${qrRequests.map(request => request.requestId).join(',') || 'none'}`,
+        `hostKeys=${this.describeKeys(this.host).join(',') || 'none'}`,
+      ].join(' '),
+      {
+        isConfigured: this.isConfigured(),
+        rawRequestCount: extractedRequests.length,
+        qrRequestCount: qrRequests.length,
+        hostKeys: this.describeKeys(this.host),
+        qrRequests: qrRequests.map(request => ({
+          requestId: request.requestId,
+          title: request.title,
+          status: request.status,
+        })),
+      },
+    );
   }
 
   private debugLog(message: string, details?: unknown): void {

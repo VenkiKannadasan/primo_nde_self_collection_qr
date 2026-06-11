@@ -1,3 +1,25 @@
+<div class="self-collection-qr-action" *ngIf="shouldRenderAction" aria-live="polite">
+  <button
+    class="self-collection-qr-action__button"
+    type="button"
+    *ngFor="let request of actionRequests; trackBy: trackByRequestId"
+    (click)="openQr(request)"
+    [attr.aria-label]="config.imageAlt + ' for ' + request.title"
+  >
+    <img
+      *ngIf="!isQrImageUnavailable(request); else actionQrUnavailable"
+      class="self-collection-qr-action__image"
+      [src]="request.qrUrl"
+      [alt]="config.imageAlt + ' for ' + request.title"
+      [attr.crossorigin]="config.crossOrigin || null"
+      (error)="onQrImageError(request)"
+    />
+    <ng-template #actionQrUnavailable>
+      <span class="self-collection-qr-action__fallback">{{ config.unavailableText }}</span>
+    </ng-template>
+  </button>
+</div>
+
 <section class="self-collection-qr" *ngIf="shouldRender" aria-live="polite">
   <header class="self-collection-qr__header">
     <h2>{{ config.heading }}</h2>

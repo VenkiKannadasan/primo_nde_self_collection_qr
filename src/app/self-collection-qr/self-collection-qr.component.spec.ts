@@ -220,16 +220,36 @@ describe('SelfCollectionQrComponent', () => {
     tick(150);
     fixture.detectChanges();
 
-    const inlineQr = requestsRoot.querySelector('.self-collection-qr-inline') as HTMLButtonElement | null;
+    const inlineQr = fixture.nativeElement.querySelector('.self-collection-qr-action__button') as HTMLButtonElement | null;
+    const inlineQrImage = inlineQr?.querySelector('img') ?? null;
     const sectionFallback = fixture.nativeElement.querySelector('.self-collection-qr');
 
     expect(inlineQr).not.toBeNull();
-    expect(inlineQr?.dataset['requestId']).toBe('2207101260008082');
-    expect(inlineQr?.parentElement?.querySelector('[data-qa="request-item-cancel-btn"]')).not.toBeNull();
+    expect(inlineQrImage?.src).toContain('c=2207101260008082');
     expect(sectionFallback).toBeNull();
 
     discardPeriodicTasks();
   }));
+
+  it('renders QR codes from a direct request host component object', () => {
+    component.hostComponent = {
+      request: {
+        holds: {
+          request_id: '2207101260008082',
+          status: 'Request. On Hold Shelf until 22/06/2026',
+        },
+        title: 'Decision analytics : Microsoft Excel / Conrad Carlberg. (PBK.)',
+      },
+    };
+
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    const qrImage = compiled.querySelector('.self-collection-qr__image') as HTMLImageElement | null;
+
+    expect(compiled.textContent).toContain('Decision analytics : Microsoft Excel / Conrad Carlberg. (PBK.)');
+    expect(qrImage?.src).toContain('c=2207101260008082');
+  });
 
   it('accepts Alma object parameters when they arrive as a key-value string', () => {
     TestBed.resetTestingModule();

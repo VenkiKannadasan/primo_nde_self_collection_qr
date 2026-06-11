@@ -1,3 +1,49 @@
 :host {
   display: block;
 }
+
+.self-collection-qr-action {
+  align-items: center;
+  display: inline-flex;
+  gap: 8px;
+  margin: 0 8px;
+  vertical-align: middle;
+}
+
+.self-collection-qr-action__button {
+  align-items: center;
+  appearance: none;
+  background: #f8fafc;
+  border: 1px solid rgba(15, 23, 42, 0.18);
+  border-radius: 8px;
+  cursor: pointer;
+  display: inline-flex;
+  height: 96px;
+  justify-content: center;
+  padding: 8px;
+  width: 96px;
+}
+
+.self-collection-qr-action__button:hover,
+.self-collection-qr-action__button:focus-visible {
+  border-color: rgba(68, 64, 60, 0.45);
+}
+
+.self-collection-qr-action__button:focus-visible {
+  outline: 3px solid #f5c542;
+  outline-offset: 2px;
+}
+
+.self-collection-qr-action__image {
+  display: block;
+  height: 80px;
+  object-fit: contain;
+  width: 80px;
+}
+
+.self-collection-qr-action__fallback {
+  color: #6b7280;
+  font-size: 12px;
+  line-height: 1.25;
+  text-align: center;
+}

@@ -52,7 +52,7 @@ export const AppModule = ({providers, shellRouter}: {providers:any, shellRouter:
     public getComponentRef(componentName:string) {
       const componentRef = this.webComponentSelectorMap.get(componentName);
 
-      if (componentRef || !this.loggedComponentRefNames.has(componentName)) {
+      if (componentRef && !this.loggedComponentRefNames.has(componentName)) {
         this.loggedComponentRefNames.add(componentName);
         console.info(
           `[SelfCollectionQr] getComponentRef componentName=${componentName} found=${Boolean(componentRef)} registered=${Array.from(this.webComponentSelectorMap.keys()).join(',')}`,
