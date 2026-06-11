@@ -7,8 +7,9 @@ This add-on recreates the previous Primo behavior for self-collection locker QR 
 - Reads the host Requests component through the NDE `hostComponent` input.
 - Filters requests whose status contains a ready-for-collection label such as `On Hold Shelf`, `Available for Pickup`, or `Ready for Collection`.
 - Builds the locker service image URL with query parameters `a`, `b`, and `c`, where `c` is the Primo request ID.
-- Places the QR code inline on the matching request row when NDE invokes the request actions hook or exposes a row anchor.
+- Renders the QR code directly inside the NDE `nde-record-actions-bottom` request-row action hook.
 - Shows a fallback QR card per eligible request if the inline row cannot be found.
+- Opens a centered QR overlay when the patron clicks the inline QR.
 
 ## Alma Add-On Parameters
 
@@ -29,7 +30,7 @@ Keep locker service secrets in Alma add-on configuration, not in source control.
 }
 ```
 
-If the NDE Requests customization hook differs in a tenant, update `REQUESTS_TAB_SELECTORS` in `src/app/custom1-module/customComponentMappings.ts`. Current testing has shown NDE requesting `nde-record-actions-bottom` for the Requests row action area.
+If the NDE Requests customization hook differs in a tenant, update `REQUESTS_TAB_SELECTORS` in `src/app/custom1-module/customComponentMappings.ts`. Current testing has shown NDE requesting `nde-record-actions-bottom` for the Requests row action area; this is the same hosted add-on pattern used by the PayNow button.
 
 If the NDE request row markup differs, keep the add-on hook as-is and override `rowSelector` in Alma parameters with a selector that matches one request row.
 
@@ -44,6 +45,8 @@ Prefer Alma **Add-On Configuration** when available. This matches the PayNow-sty
 - Put test or production JSON in Alma configuration parameters.
 
 The add-on already reads Alma parameters through `MODULE_PARAMETERS`, so no rebuild is needed when switching between placeholder QR testing and the real locker service, as long as the Alma Add-On Configuration flow is used.
+
+If using GitHub Pages, the Pages site must be publicly reachable from patron browsers even if the repository itself is private. Alma cannot load a privately published or authenticated Pages site.
 
 ### Placeholder Test Configuration
 

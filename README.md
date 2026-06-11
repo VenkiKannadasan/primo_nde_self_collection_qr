@@ -1,6 +1,6 @@
 # primo_nde_self_collection_qr
 
-This repository packages the self-collection kiosk QR code customization for Primo NDE. The add-on is wired to the Requests tab customization hook and recreates the previous Primo behavior: only ready-for-collection requests receive a QR code, and the locker service receives the Primo `requestId` as query parameter `c`.
+This repository packages the self-collection kiosk QR code customization for Primo NDE. The add-on recreates the previous Primo behavior: only ready-for-collection requests receive a QR code, and the locker service receives the Primo `requestId` as query parameter `c`.
 
 Locker service parameters should be configured in Alma add-on JSON rather than committed to source control:
 
@@ -22,7 +22,9 @@ Preferred deployment matches the PayNow hosted add-on model:
 - Add-on name: `primo_nde_self_collection_qr`
 - Add-on URL: `https://venkikannadasan.github.io/primo_nde_self_collection_qr/`
 
-The Requests hooks are isolated in `src/app/custom1-module/customComponentMappings.ts` as `REQUESTS_TAB_SELECTORS`. The add-on registers the Requests root hooks plus `nde-record-actions-bottom`, which current NDE request rows ask for when rendering the row action area.
+The working Requests hook is `nde-record-actions-bottom`. This is the per-row action area that NDE invokes for request records, so the QR renders directly from the custom element in the same style as the PayNow add-on instead of patching the row after render. The Requests hooks are isolated in `src/app/custom1-module/customComponentMappings.ts` as `REQUESTS_TAB_SELECTORS`.
+
+The GitHub Pages URL configured in Alma must remain reachable without GitHub authentication. The repository can be private only if GitHub Pages is still published publicly and your GitHub plan supports Pages from private repositories. Do not switch the Pages site itself to private/authenticated access for Alma, because Primo patrons' browsers must be able to load `remoteEntry.js` directly.
 
 For more setup notes, see `docs/self-collection-qr-addon.md` and `docs/deployment.md`.
 

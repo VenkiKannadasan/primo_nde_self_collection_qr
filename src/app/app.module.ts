@@ -30,7 +30,6 @@ export const AppModule = ({providers, shellRouter}: {providers:any, shellRouter:
   })
   class AppModule implements DoBootstrap{
     private webComponentSelectorMap = new Map<string,  NgElementConstructor<unknown>>();
-    private loggedComponentRefNames = new Set<string>();
 
     constructor(private injector: Injector, private router: Router) {
       router.dispose(); //this prevents the router from being initialized and interfering with the shell app router
@@ -41,8 +40,6 @@ export const AppModule = ({providers, shellRouter}: {providers:any, shellRouter:
         const customElement = createCustomElement(value, {injector: this.injector});
         this.webComponentSelectorMap.set(key, customElement);
       }
-
-      console.info('[SelfCollectionQr] registered NDE selectors', Array.from(this.webComponentSelectorMap.keys()));
     }
 
     /**
@@ -50,16 +47,7 @@ export const AppModule = ({providers, shellRouter}: {providers:any, shellRouter:
      * @param componentName
      */
     public getComponentRef(componentName:string) {
-      const componentRef = this.webComponentSelectorMap.get(componentName);
-
-      if (componentRef && !this.loggedComponentRefNames.has(componentName)) {
-        this.loggedComponentRefNames.add(componentName);
-        console.info(
-          `[SelfCollectionQr] getComponentRef componentName=${componentName} found=${Boolean(componentRef)} registered=${Array.from(this.webComponentSelectorMap.keys()).join(',')}`,
-        );
-      }
-
-      return componentRef;
+      return this.webComponentSelectorMap.get(componentName);
     }
   }
   return AppModule

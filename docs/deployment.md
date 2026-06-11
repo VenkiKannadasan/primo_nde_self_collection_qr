@@ -11,6 +11,8 @@ Required hosting behavior:
 - No authentication wall in front of the add-on bundle.
 - CORS headers that allow Primo NDE to load the module.
 
+GitHub repository visibility and Pages visibility are separate concerns. Alma and Primo do not authenticate to GitHub; the patron browser downloads the add-on bundle directly. A private repository is acceptable only when the GitHub Pages site remains publicly accessible at the configured URL and the GitHub account/organization plan supports Pages from private repositories. If the Pages site is published privately, moved to an authenticated enterprise-only URL, or disabled by plan limits, Alma will not be able to load the add-on.
+
 ## Alma Add-On Configuration
 
 Use:
@@ -52,7 +54,8 @@ For production locker QR codes:
 
 Before production activation:
 
-1. Confirm the NDE hook selector `nde-record-actions-bottom`, `nde-requests`, or `nde-requests-after` renders in the Requests tab.
-2. Confirm ready requests expose a request ID through the host component or expanded row.
+1. Confirm NDE requests `nde-record-actions-bottom` in the Requests tab.
+2. Confirm the add-on renders QR images beside only ready requests.
 3. Confirm placeholder QR mode renders only for `On Hold Shelf` requests.
 4. Confirm production locker mode returns a valid QR for a request that exists in the locker system.
+5. Confirm clicking a QR opens the centered overlay and can be closed.
