@@ -51,7 +51,8 @@ The add-on already reads Alma parameters through `MODULE_PARAMETERS`, so no rebu
 {
   "selfCollectionQr": {
     "qrUrlTemplate": "https://api.qrserver.com/v1/create-qr-code/?size=220x220&data={requestId}",
-    "eligibleStatuses": ["On Hold Shelf"]
+    "eligibleStatuses": ["On Hold Shelf"],
+    "debug": true
   }
 }
 ```

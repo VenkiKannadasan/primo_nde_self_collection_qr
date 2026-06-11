@@ -24,10 +24,13 @@ For placeholder QR testing:
 {
   "selfCollectionQr": {
     "qrUrlTemplate": "https://api.qrserver.com/v1/create-qr-code/?size=220x220&data={requestId}",
-    "eligibleStatuses": ["On Hold Shelf"]
+    "eligibleStatuses": ["On Hold Shelf"],
+    "debug": true
   }
 }
 ```
+
+Remove `"debug": true` after testing. When enabled, the browser console logs the host component keys, request extraction counts, and matched request IDs without printing locker tokens.
 
 For production locker QR codes:
 
@@ -37,7 +40,8 @@ For production locker QR codes:
     "serviceUrl": "https://lockerwebservice.message.sg/npa_ws/apiPublic.aspx",
     "queryParamA": "<locker-service-a-token>",
     "queryParamB": "<locker-service-b-token>",
-    "eligibleStatuses": ["On Hold Shelf"]
+    "eligibleStatuses": ["On Hold Shelf"],
+    "debug": false
   }
 }
 ```

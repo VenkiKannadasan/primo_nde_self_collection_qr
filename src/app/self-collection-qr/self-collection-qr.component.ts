@@ -13,6 +13,7 @@ import {
 
 interface RawSelfCollectionQrConfig {
   enabled?: boolean;
+  debug?: boolean;
   placement?: SelfCollectionQrPlacement;
   showSectionFallback?: boolean;
   serviceUrl?: string;
@@ -44,6 +45,7 @@ interface SelfCollectionQrModuleParameters extends RawSelfCollectionQrConfig {
 
 interface SelfCollectionQrConfig {
   enabled: boolean;
+  debug: boolean;
   placement: SelfCollectionQrPlacement;
   showSectionFallback: boolean;
   serviceUrl: string;
@@ -108,6 +110,9 @@ export class SelfCollectionQrComponent implements OnDestroy {
   @Input()
   set hostComponent(value: unknown) {
     this.host = value;
+    this.debugLog('hostComponent received', {
+      hostKeys: this.describeKeys(value),
+    });
     this.refreshRequests();
     this.observeRequestDom();
   }
@@ -128,6 +133,7 @@ export class SelfCollectionQrComponent implements OnDestroy {
   private inlinePlacementHandle: number | null = null;
   private inlinePlacedRequestIds = new Set<string>();
   private hasLoggedMissingConfig = false;
+  private lastDebugSignature = '';
 
   constructor(
     @Optional() @Inject('MODULE_PARAMETERS') moduleParameters: SelfCollectionQrModuleParameters | null,
@@ -137,6 +143,10 @@ export class SelfCollectionQrComponent implements OnDestroy {
     private readonly changeDetector: ChangeDetectorRef,
   ) {
     this.config = this.buildConfig(moduleParameters);
+    this.debugLog('initialized', {
+      config: this.configForLog(),
+      moduleParameterKeys: this.describeKeys(moduleParameters),
+    });
     this.startPolling();
   }
 
@@ -203,6 +213,7 @@ export class SelfCollectionQrComponent implements OnDestroy {
 
     return {
       enabled: raw.enabled ?? true,
+      debug: raw.debug ?? false,
       placement: raw.placement ?? 'inline',
       showSectionFallback: raw.showSectionFallback ?? true,
       serviceUrl: raw.serviceUrl ?? DEFAULT_SERVICE_URL,
@@ -257,6 +268,7 @@ export class SelfCollectionQrComponent implements OnDestroy {
       this.changeDetector.markForCheck();
     }
 
+    this.debugRequestExtraction(extractedRequests, qrRequests, signature);
     this.scheduleInlinePlacement();
   }
 
@@ -287,6 +299,9 @@ export class SelfCollectionQrComponent implements OnDestroy {
       'requestId',
       'requestID',
       'request_id',
+      'request-id',
+      'requestIdentifier',
+      'requestNumber',
       'id',
     ]);
     const title = this.textFromFirst(rawRequest, [
@@ -394,7 +409,9 @@ export class SelfCollectionQrComponent implements OnDestroy {
         continue;
       }
 
-      if (!/request\s*id\s*:/i.test(candidate.textContent ?? '')) {
+      const candidateText = candidate.textContent ?? '';
+
+      if (!/request\s*id\s*:/i.test(candidateText) && !this.statusIsEligible(candidateText)) {
         continue;
       }
 
@@ -411,9 +428,7 @@ export class SelfCollectionQrComponent implements OnDestroy {
   }
 
   private requestFromDomRow(row: HTMLElement): Record<string, string> | null {
-    const rowText = this.normalizeWhitespace(row.textContent ?? '');
-    const requestIdMatch = rowText.match(/request\s*id\s*:\s*([^\s]+)/i);
-    const requestId = requestIdMatch?.[1] ?? '';
+    const requestId = this.findRequestIdFromDomRow(row);
     const status = this.findStatusFromDomRow(row);
     const title = this.findTitleFromDomRow(row);
 
@@ -436,7 +451,7 @@ export class SelfCollectionQrComponent implements OnDestroy {
       const text = current.textContent ?? '';
 
       if (
-        /request\s*id\s*:/i.test(text)
+        (/request\s*id\s*:/i.test(text) || this.statusIsEligible(text) || this.findRequestIdFromDomRow(current))
         && this.findStatusFromDomRow(current)
         && this.findTitleFromDomRow(current)
       ) {
@@ -459,6 +474,37 @@ export class SelfCollectionQrComponent implements OnDestroy {
     return textCandidates.find(text => this.statusIsEligible(text))
       ?? textCandidates.find(text => /^request\./i.test(text))
       ?? '';
+  }
+
+  private findRequestIdFromDomRow(row: HTMLElement): string {
+    const rowText = this.normalizeWhitespace(row.textContent ?? '');
+    const textMatch = rowText.match(/request\s*id\s*:\s*([^\s]+)/i);
+
+    if (textMatch?.[1]) {
+      return textMatch[1];
+    }
+
+    const elements = [row, ...Array.from(row.querySelectorAll<HTMLElement>('*'))];
+
+    for (const element of elements) {
+      for (const attributeName of element.getAttributeNames()) {
+        const attributeValue = element.getAttribute(attributeName) ?? '';
+        const normalizedName = this.normalizeFieldKey(attributeName);
+
+        if (normalizedName.includes('requestid') && attributeValue.trim().length > 0) {
+          return attributeValue.trim();
+        }
+
+        const attributeMatch = attributeValue.match(/(?:requestId|request_id|request-id|request\s*id)\s*[:=]\s*([^&\s"']+)/i)
+          ?? attributeValue.match(/[?&](?:requestId|request_id|request-id)=([^&\s"']+)/i);
+
+        if (attributeMatch?.[1]) {
+          return decodeURIComponent(attributeMatch[1]);
+        }
+      }
+    }
+
+    return '';
   }
 
   private findTitleFromDomRow(row: HTMLElement): string {
@@ -550,6 +596,9 @@ export class SelfCollectionQrComponent implements OnDestroy {
       'requestId',
       'requestID',
       'request_id',
+      'request-id',
+      'requestIdentifier',
+      'requestNumber',
       'id',
     ]).length > 0;
     const hasTitleAndStatus = this.textFromFirst(value, ['title', 'displayTitle', 'recordTitle', 'itemTitle']).length > 0
@@ -564,6 +613,76 @@ export class SelfCollectionQrComponent implements OnDestroy {
 
       if (text.length > 0) {
         return text;
+      }
+    }
+
+    return this.findTextByKey(record, keys, 0, new WeakSet<object>());
+  }
+
+  private findTextByKey(source: unknown, keys: string[], depth: number, seen: WeakSet<object>): string {
+    if (!this.isRecord(source) || depth > 5) {
+      return '';
+    }
+
+    const sourceObject = source as object;
+
+    if (seen.has(sourceObject)) {
+      return '';
+    }
+
+    seen.add(sourceObject);
+
+    const normalizedKeys = new Set(keys.map(key => this.normalizeFieldKey(key)));
+
+    for (const [key, value] of Object.entries(source)) {
+      if (this.shouldSkipRecursiveKey(key)) {
+        continue;
+      }
+
+      if (normalizedKeys.has(this.normalizeFieldKey(key))) {
+        const text = this.scalarValueToText(value).trim();
+
+        if (text.length > 0) {
+          return text;
+        }
+      }
+    }
+
+    for (const [key, value] of Object.entries(source)) {
+      if (this.shouldSkipRecursiveKey(key)) {
+        continue;
+      }
+
+      const text = this.findTextByKey(value, keys, depth + 1, seen);
+
+      if (text.length > 0) {
+        return text;
+      }
+    }
+
+    return '';
+  }
+
+  private scalarValueToText(value: unknown): string {
+    if (value === null || value === undefined) {
+      return '';
+    }
+
+    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+      return String(value);
+    }
+
+    if (Array.isArray(value)) {
+      return value.map(item => this.scalarValueToText(item)).filter(text => text.length > 0).join(' ');
+    }
+
+    if (this.isRecord(value)) {
+      for (const key of ['display', 'desc', 'description', 'label', 'value', 'code', 'name']) {
+        const text = this.scalarValueToText(value[key]).trim();
+
+        if (text.length > 0) {
+          return text;
+        }
       }
     }
 
@@ -872,5 +991,74 @@ export class SelfCollectionQrComponent implements OnDestroy {
 
   private normalizeWhitespace(text: string): string {
     return text.replace(/\s+/g, ' ').trim();
+  }
+
+  private normalizeFieldKey(key: string): string {
+    return key.replace(/[^a-z0-9]/gi, '').toLowerCase();
+  }
+
+  private describeKeys(value: unknown): string[] {
+    if (!this.isRecord(value)) {
+      return [];
+    }
+
+    return Object.keys(value).slice(0, 40);
+  }
+
+  private configForLog(): Record<string, unknown> {
+    return {
+      enabled: this.config.enabled,
+      placement: this.config.placement,
+      showSectionFallback: this.config.showSectionFallback,
+      hasQrUrlTemplate: this.config.qrUrlTemplate.trim().length > 0,
+      hasQueryParamA: this.config.queryParamA.trim().length > 0,
+      hasQueryParamB: this.config.queryParamB.trim().length > 0,
+      eligibleStatuses: this.config.eligibleStatuses,
+      observerSelector: this.config.observerSelector,
+      rowSelector: this.config.rowSelector,
+    };
+  }
+
+  private debugRequestExtraction(
+    extractedRequests: unknown[],
+    qrRequests: SelfCollectionRequest[],
+    signature: string,
+  ): void {
+    if (!this.config.debug) {
+      return;
+    }
+
+    const debugSignature = [
+      extractedRequests.length,
+      qrRequests.length,
+      signature,
+      this.isConfigured(),
+      this.describeKeys(this.host).join(','),
+    ].join('|');
+
+    if (debugSignature === this.lastDebugSignature) {
+      return;
+    }
+
+    this.lastDebugSignature = debugSignature;
+    this.debugLog('request extraction', {
+      isConfigured: this.isConfigured(),
+      rawRequestCount: extractedRequests.length,
+      qrRequestCount: qrRequests.length,
+      hostKeys: this.describeKeys(this.host),
+      qrRequests: qrRequests.map(request => ({
+        requestId: request.requestId,
+        title: request.title,
+        status: request.status,
+      })),
+    });
+  }
+
+  private debugLog(message: string, details?: unknown): void {
+    if (!this.config?.debug) {
+      return;
+    }
+
+    console.info(`[SelfCollectionQr] ${message}`, details ?? '');
   }
 }

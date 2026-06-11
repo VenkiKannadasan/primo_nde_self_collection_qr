@@ -78,7 +78,7 @@ module.exports = {
         "@angular/common/http": { requiredVersion: "auto" },
         '@angular/platform-browser': { requiredVersion: 'auto' },
         '@ngx-translate/core': { singleton: true},
-        '@ngrx/store': { singleton: true},
+        '@ngrx/store': { singleton: true, requiredVersion: false },
         ...sharedMappings.getDescriptors()
       })
 

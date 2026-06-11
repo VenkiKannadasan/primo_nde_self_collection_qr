@@ -88,6 +88,29 @@ describe('SelfCollectionQrComponent', () => {
     expect(qrImage?.src).toContain('c=2207101260008082');
   });
 
+  it('renders QR codes from request row attributes when the request ID is not visible', () => {
+    const requestsRoot = document.createElement('nde-requests');
+    requestsRoot.innerHTML = `
+      <section class="request-row" data-request-id="2207101260008082">
+        <a href="/discovery/fulldisplay">Decision analytics : Microsoft Excel / Conrad Carlberg. (PBK.)</a>
+        <div>Request. On Hold Shelf until 22/06/2026</div>
+        <div>Carldberg, Conrad George.</div>
+        <div>Pick up: NP Library</div>
+        <button aria-label="Cancel request">Cancel</button>
+      </section>
+    `;
+    document.body.appendChild(requestsRoot);
+
+    component.hostComponent = {};
+    fixture.detectChanges();
+
+    const compiled = fixture.nativeElement as HTMLElement;
+    const qrImage = compiled.querySelector('.self-collection-qr__image') as HTMLImageElement | null;
+
+    expect(compiled.textContent).toContain('Decision analytics : Microsoft Excel / Conrad Carlberg. (PBK.)');
+    expect(qrImage?.src).toContain('c=2207101260008082');
+  });
+
   it('does not render QR codes from an expanded NDE request row while it is in process', () => {
     const requestsRoot = document.createElement('nde-requests');
     requestsRoot.innerHTML = `
