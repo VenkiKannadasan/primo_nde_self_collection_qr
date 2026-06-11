@@ -87,6 +87,9 @@ const DEFAULT_ELIGIBLE_STATUSES = [
   'Ready for Collection',
 ];
 const DEFAULT_ROW_SELECTOR = [
+  'nde-request-item',
+  'prm-request-item',
+  '.request-item-container',
   'md-list-item',
   'mat-expansion-panel',
   '.mat-expansion-panel',
@@ -114,6 +117,7 @@ export class SelfCollectionQrComponent implements OnDestroy {
     this.debugLog('hostComponent received', {
       hostKeys: this.describeKeys(value),
     });
+    this.debugHostComponent(value);
     this.refreshRequests();
     this.observeRequestDom();
   }
@@ -135,6 +139,8 @@ export class SelfCollectionQrComponent implements OnDestroy {
   private inlinePlacedRequestIds = new Set<string>();
   private hasLoggedMissingConfig = false;
   private lastDebugSignature = '';
+  private lastInlinePlacementDebugSignature = '';
+  private lastHostDebugSignature = '';
 
   constructor(
     @Optional() @Inject('MODULE_PARAMETERS') moduleParameters: SelfCollectionQrModuleParameters | null,
@@ -233,7 +239,7 @@ export class SelfCollectionQrComponent implements OnDestroy {
       observerSelector: this.readString(raw.observerSelector, 'nde-requests, prm-requests'),
       rowSelector: this.readString(raw.rowSelector, DEFAULT_ROW_SELECTOR),
       refreshIntervalMs: Math.max(this.readNumber(raw.refreshIntervalMs, 1000), 250),
-      crossOrigin: this.readCrossOrigin(raw.crossOrigin, 'anonymous'),
+      crossOrigin: this.readCrossOrigin(raw.crossOrigin, ''),
     };
   }
 
@@ -628,13 +634,16 @@ export class SelfCollectionQrComponent implements OnDestroy {
   private extractRequests(host: unknown): unknown[] {
     const directRequestArrays = this.readDirectRequestArrays(host);
     const domRequests = this.extractRequestsFromDom();
+    const recursiveRequestArrays = directRequestArrays.length > 0
+      ? []
+      : this.findRequestArrays(host, 0, new WeakSet<object>(), []);
 
     if (directRequestArrays.length > 0) {
       return [...directRequestArrays, ...domRequests];
     }
 
     return [
-      ...(this.findRequestArray(host, 0, new WeakSet<object>()) ?? []),
+      ...recursiveRequestArrays.flat(),
       ...domRequests,
     ];
   }
@@ -725,7 +734,7 @@ export class SelfCollectionQrComponent implements OnDestroy {
         && this.findStatusFromDomRow(current)
         && this.findTitleFromDomRow(current)
       ) {
-        return current;
+        return this.findSemanticRequestRow(current, root) ?? current;
       }
 
       current = current.parentElement;
@@ -807,19 +816,28 @@ export class SelfCollectionQrComponent implements OnDestroy {
     return current;
   }
 
-  private findRequestArray(source: unknown, depth: number, seen: WeakSet<object>): unknown[] | null {
+  private findRequestArrays(
+    source: unknown,
+    depth: number,
+    seen: WeakSet<object>,
+    arrays: unknown[][],
+  ): unknown[][] {
     if (Array.isArray(source)) {
-      return source.some(item => this.looksLikeRequest(item)) ? source : null;
+      if (source.some(item => this.looksLikeRequest(item))) {
+        arrays.push(source);
+      }
+
+      return arrays;
     }
 
     if (!this.isRecord(source) || depth >= 4) {
-      return null;
+      return arrays;
     }
 
     const sourceObject = source as object;
 
     if (seen.has(sourceObject)) {
-      return null;
+      return arrays;
     }
 
     seen.add(sourceObject);
@@ -837,14 +855,10 @@ export class SelfCollectionQrComponent implements OnDestroy {
         continue;
       }
 
-      const found = this.findRequestArray(child, depth + 1, seen);
-
-      if (found) {
-        return found;
-      }
+      this.findRequestArrays(child, depth + 1, seen, arrays);
     }
 
-    return null;
+    return arrays;
   }
 
   private shouldSkipRecursiveKey(key: string): boolean {
@@ -1070,25 +1084,28 @@ export class SelfCollectionQrComponent implements OnDestroy {
         continue;
       }
 
-      const row = this.findRequestRow(root, request.title);
+      const row = this.findRequestRow(root, request);
 
       if (!row) {
         continue;
       }
 
       const inlineQr = this.createInlineQrElement(request);
-      const actionAnchor = this.findActionAnchor(row);
+      const placementTarget = this.findInlinePlacementTarget(row);
 
-      if (actionAnchor?.parentElement) {
-        actionAnchor.parentElement.insertBefore(inlineQr, actionAnchor);
+      if (placementTarget) {
+        placementTarget.container.insertBefore(inlineQr, placementTarget.before);
       } else {
         row.appendChild(inlineQr);
       }
 
-      placedRequestIds.add(request.requestId);
+      if (inlineQr.isConnected) {
+        placedRequestIds.add(request.requestId);
+      }
     }
 
     this.inlinePlacedRequestIds = placedRequestIds;
+    this.debugInlinePlacement(validRequestIds, placedRequestIds);
     this.changeDetector.markForCheck();
   }
 
@@ -1110,7 +1127,51 @@ export class SelfCollectionQrComponent implements OnDestroy {
     return elements.find(element => element.dataset['requestId'] === requestId) ?? null;
   }
 
-  private findRequestRow(root: HTMLElement, title: string): HTMLElement | null {
+  private findRequestRow(root: HTMLElement, request: SelfCollectionRequest): HTMLElement | null {
+    return this.findRequestRowByRequestId(root, request.requestId)
+      ?? this.findRequestRowByTitle(root, request.title);
+  }
+
+  private findRequestRowByRequestId(root: HTMLElement, requestId: string): HTMLElement | null {
+    const normalizedRequestId = this.normalizeWhitespace(requestId);
+
+    if (!normalizedRequestId) {
+      return null;
+    }
+
+    const candidates = Array.from(root.querySelectorAll<HTMLElement>(
+      '[data-qa*="request_id" i], [data-qa*="request-id" i], [data-request-id], span, div, p, a, button',
+    ));
+
+    for (const candidate of candidates) {
+      if (this.elementRef.nativeElement.contains(candidate)) {
+        continue;
+      }
+
+      const candidateRequestId = this.findRequestIdFromDomRow(candidate);
+      const candidateText = this.normalizeWhitespace(candidate.textContent ?? '');
+      const candidateLooksLikeRequestIdField = /request\s*id\s*:/i.test(candidateText)
+        || /request[_-]?id/i.test(candidate.getAttribute('data-qa') ?? '')
+        || candidate.hasAttribute('data-request-id');
+
+      if (
+        candidateRequestId !== normalizedRequestId
+        && !(candidateLooksLikeRequestIdField && this.textContainsToken(candidateText, normalizedRequestId))
+      ) {
+        continue;
+      }
+
+      const row = this.findNearestRequestRow(candidate, root);
+
+      if (row) {
+        return row;
+      }
+    }
+
+    return null;
+  }
+
+  private findRequestRowByTitle(root: HTMLElement, title: string): HTMLElement | null {
     const normalizedTitle = this.normalizeText(title);
 
     if (!normalizedTitle) {
@@ -1143,6 +1204,12 @@ export class SelfCollectionQrComponent implements OnDestroy {
   }
 
   private findNearestRequestRow(candidate: HTMLElement, root: HTMLElement): HTMLElement | null {
+    const semanticRow = this.findSemanticRequestRow(candidate, root);
+
+    if (semanticRow) {
+      return semanticRow;
+    }
+
     try {
       const selectorMatch = candidate.closest(this.config.rowSelector);
 
@@ -1173,8 +1240,33 @@ export class SelfCollectionQrComponent implements OnDestroy {
     return null;
   }
 
+  private findSemanticRequestRow(candidate: HTMLElement, root: HTMLElement): HTMLElement | null {
+    const selectors = [
+      'nde-request-item',
+      'prm-request-item',
+      '.request-item-container',
+      '[data-qa="requests-item"]',
+    ];
+
+    for (const selector of selectors) {
+      const row = candidate.closest(selector);
+
+      if (
+        row instanceof HTMLElement
+        && row !== root
+        && root.contains(row)
+        && !this.elementRef.nativeElement.contains(row)
+      ) {
+        return row;
+      }
+    }
+
+    return null;
+  }
+
   private findActionAnchor(row: HTMLElement): HTMLElement | null {
     const actionSelectors = [
+      'button[data-qa="request-item-cancel-btn"]',
       'button[aria-label*="Cancel" i]',
       'button[title*="Cancel" i]',
       'a[role="button"][aria-label*="Cancel" i]',
@@ -1187,6 +1279,39 @@ export class SelfCollectionQrComponent implements OnDestroy {
       if (action instanceof HTMLElement && !action.classList.contains('self-collection-qr-inline')) {
         return action;
       }
+    }
+
+    return null;
+  }
+
+  private findInlinePlacementTarget(row: HTMLElement): { container: HTMLElement; before: ChildNode | null } | null {
+    const actionAnchor = this.findActionAnchor(row);
+
+    if (actionAnchor?.parentElement) {
+      return {
+        container: actionAnchor.parentElement,
+        before: actionAnchor.nextSibling,
+      };
+    }
+
+    const actionContainer = row.querySelector<HTMLElement>(
+      '[data-qa="requests_actions_container"], .request-actions',
+    );
+
+    if (actionContainer) {
+      return {
+        container: actionContainer,
+        before: null,
+      };
+    }
+
+    const requestContainer = row.querySelector<HTMLElement>('.request-item-container');
+
+    if (requestContainer) {
+      return {
+        container: requestContainer,
+        before: null,
+      };
     }
 
     return null;
@@ -1209,7 +1334,7 @@ export class SelfCollectionQrComponent implements OnDestroy {
       'float:right',
       'height:104px',
       'justify-content:center',
-      'margin-left:auto',
+      'margin:8px 0 0 16px',
       'padding:8px',
       'width:104px',
       'flex:0 0 auto',
@@ -1259,6 +1384,14 @@ export class SelfCollectionQrComponent implements OnDestroy {
     return this.normalizeWhitespace(text).toLowerCase();
   }
 
+  private textContainsToken(text: string, token: string): boolean {
+    return new RegExp(`(^|\\D)${this.escapeRegExp(token)}($|\\D)`).test(text);
+  }
+
+  private escapeRegExp(value: string): string {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
   private normalizeWhitespace(text: string): string {
     return text.replace(/\s+/g, ' ').trim();
   }
@@ -1275,6 +1408,122 @@ export class SelfCollectionQrComponent implements OnDestroy {
     return Object.keys(value).slice(0, 40);
   }
 
+  private debugHostComponent(host: unknown): void {
+    if (!this.config.debug) {
+      return;
+    }
+
+    const candidates = this.collectHostArrayCandidates(host);
+    const signature = JSON.stringify({
+      hostKeys: this.describeKeys(host),
+      candidates,
+    });
+
+    if (signature === this.lastHostDebugSignature) {
+      return;
+    }
+
+    this.lastHostDebugSignature = signature;
+    this.debugLog('host component data candidates', {
+      hostKeys: this.describeKeys(host),
+      candidates,
+    });
+  }
+
+  private collectHostArrayCandidates(host: unknown): Array<Record<string, unknown>> {
+    const candidates: Array<Record<string, unknown>> = [];
+
+    this.visitHostArrayCandidates(host, [], 0, new WeakSet<object>(), candidates);
+
+    return candidates;
+  }
+
+  private visitHostArrayCandidates(
+    source: unknown,
+    path: string[],
+    depth: number,
+    seen: WeakSet<object>,
+    candidates: Array<Record<string, unknown>>,
+  ): void {
+    if (candidates.length >= 20) {
+      return;
+    }
+
+    if (Array.isArray(source)) {
+      const sample = source.find(item => this.isRecord(item)) as Record<string, unknown> | undefined;
+
+      if (!sample) {
+        return;
+      }
+
+      const pathText = path.join('.') || '<root>';
+      const sampleKeys = this.describeKeys(sample);
+      const requestLike = source.some(item => this.looksLikeRequest(item));
+      const pathLooksRelevant = /request|hold|booking|item/i.test(pathText);
+      const sampleLooksRelevant = sampleKeys.some(key => /request|hold|booking|status|title|item/i.test(key));
+
+      if (requestLike || pathLooksRelevant || sampleLooksRelevant) {
+        candidates.push({
+          path: pathText,
+          length: source.length,
+          requestLike,
+          sampleKeys,
+          sampleRequestId: this.textFromFirst(sample, [
+            'requestId',
+            'requestID',
+            'request_id',
+            'request-id',
+            'requestIdentifier',
+            'requestNumber',
+            'id',
+          ]),
+          sampleTitle: this.textFromFirst(sample, [
+            'title',
+            'displayTitle',
+            'recordTitle',
+            'itemTitle',
+          ]),
+          sampleStatus: this.textFromFirst(sample, [
+            'status',
+            'statusText',
+            'displayStatus',
+            'requestStatus',
+          ]),
+        });
+      }
+
+      return;
+    }
+
+    if (!this.isRecord(source) || depth >= 4) {
+      return;
+    }
+
+    const sourceObject = source as object;
+
+    if (seen.has(sourceObject)) {
+      return;
+    }
+
+    seen.add(sourceObject);
+
+    for (const key of Object.keys(source).slice(0, 80)) {
+      if (this.shouldSkipRecursiveKey(key)) {
+        continue;
+      }
+
+      let child: unknown;
+
+      try {
+        child = source[key];
+      } catch {
+        continue;
+      }
+
+      this.visitHostArrayCandidates(child, [...path, key], depth + 1, seen, candidates);
+    }
+  }
+
   private configForLog(): Record<string, unknown> {
     return {
       enabled: this.config.enabled,
@@ -1286,7 +1535,31 @@ export class SelfCollectionQrComponent implements OnDestroy {
       eligibleStatuses: this.config.eligibleStatuses,
       observerSelector: this.config.observerSelector,
       rowSelector: this.config.rowSelector,
+      crossOrigin: this.config.crossOrigin,
     };
+  }
+
+  private debugInlinePlacement(validRequestIds: Set<string>, placedRequestIds: Set<string>): void {
+    if (!this.config.debug) {
+      return;
+    }
+
+    const missingRequestIds = Array.from(validRequestIds)
+      .filter(requestId => !placedRequestIds.has(requestId));
+    const signature = [
+      Array.from(placedRequestIds).join(','),
+      missingRequestIds.join(','),
+    ].join('|');
+
+    if (signature === this.lastInlinePlacementDebugSignature) {
+      return;
+    }
+
+    this.lastInlinePlacementDebugSignature = signature;
+    this.debugLog('inline placement', {
+      placedRequestIds: Array.from(placedRequestIds),
+      missingRequestIds,
+    });
   }
 
   private debugRequestExtraction(
