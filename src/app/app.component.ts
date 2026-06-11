@@ -6,7 +6,7 @@ import { Component } from '@angular/core';
   styleUrls: ['./app.component.scss']
 })
 export class AppComponent {
-  title = 'custom-module';
+  title = 'primo-nde-self-collection-qr';
   public getTitle(){
     return this.title;
   }

@@ -1,3 +1,33 @@
+# primo_nde_self_collection_qr
+
+This repository packages the self-collection kiosk QR code customization for Primo NDE. The add-on is wired to the Requests tab customization hook and recreates the previous Primo behavior: only ready-for-collection requests receive a QR code, and the locker service receives the Primo `requestId` as query parameter `c`.
+
+Locker service parameters should be configured in Alma add-on JSON rather than committed to source control:
+
+```json
+{
+  "selfCollectionQr": {
+    "serviceUrl": "https://lockerwebservice.message.sg/npa_ws/apiPublic.aspx",
+    "queryParamA": "<locker-service-a-token>",
+    "queryParamB": "<locker-service-b-token>",
+    "eligibleStatuses": ["On Hold Shelf", "Available for Pickup", "Ready for Collection"],
+    "placement": "inline",
+    "showSectionFallback": true
+  }
+}
+```
+
+Preferred deployment matches the PayNow hosted add-on model:
+
+- Add-on name: `primo_nde_self_collection_qr`
+- Add-on URL: `https://venkikannadasan.github.io/primo_nde_self_collection_qr/`
+
+The current Requests hook is isolated in `src/app/custom1-module/customComponentMappings.ts` as `REQUESTS_TAB_SELECTOR`. If Ex Libris exposes a different Requests-tab selector in the tenant, update that constant.
+
+For more setup notes, see `docs/self-collection-qr-addon.md` and `docs/deployment.md`.
+
+---
+
 # CustomModule
 
 ## ✨ New Feature (9th November 2025): Support for all customization files in assets folder:
@@ -527,4 +557,3 @@ To ensure smooth development, debugging, and code management, we recommend setti
 
 ## Conclusion
 By following these steps, you can customize and extend the NDE interface using the `CustomModule` package. If you have any questions or run into issues, refer to the project documentation or the ExLibris support.
-

@@ -1,18 +1,24 @@
 {
-  "name": "custom-module",
-  "version": "2.0.0",
+  "name": "primo_nde_self_collection_qr",
+  "version": "0.1.0",
+  "description": "Primo NDE self-collection locker QR code add-on.",
   "scripts": {
     "ng": "ng",
     "start": "ng serve",
-	"prestart": "node prebuild.js",
+    "prestart": "node prebuild.js",
     "start:no-prebundle": "ng serve --prebundle=false",
     "start:proxy": "ng serve --proxy-config ./proxy/proxy.conf.mjs",
     "build": "ng build",
+    "build:addon": "npm run build",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
-    "postbuild": "node postbuild.js",
     "prebuild": "node prebuild.js",
-    "run:all": "node node_modules/@angular-architects/module-federation/src/server/mf-dev-server.js"
+    "postbuild": "node postbuild.js",
+    "run:all": "node node_modules/@angular-architects/module-federation/src/server/mf-dev-server.js",
+    "test:ci": "ng test --watch=false --browsers=ChromeHeadless"
+  },
+  "engines": {
+    "node": ">=20.11.1 <23"
   },
   "private": true,
   "dependencies": {

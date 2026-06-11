@@ -1,0 +1,51 @@
+<section class="self-collection-qr" *ngIf="shouldRender" aria-live="polite">
+  <header class="self-collection-qr__header">
+    <h2>{{ config.heading }}</h2>
+    <p>{{ config.subheading }}</p>
+  </header>
+
+  <div class="self-collection-qr__list">
+    <article class="self-collection-qr__item" *ngFor="let request of sectionRequests; trackBy: trackByRequestId">
+      <button
+        class="self-collection-qr__image-button"
+        type="button"
+        (click)="openQr(request)"
+        [attr.aria-label]="config.imageAlt + ' for ' + request.title"
+      >
+        <img
+          *ngIf="!isQrImageUnavailable(request); else qrUnavailable"
+          class="self-collection-qr__image"
+          [src]="request.qrUrl"
+          [alt]="config.imageAlt + ' for ' + request.title"
+          [attr.crossorigin]="config.crossOrigin || null"
+          (error)="onQrImageError(request)"
+        />
+        <ng-template #qrUnavailable>
+          <span class="self-collection-qr__image-fallback">{{ config.unavailableText }}</span>
+        </ng-template>
+      </button>
+
+      <div class="self-collection-qr__details">
+        <h3>{{ request.title }}</h3>
+        <p>{{ request.status }}</p>
+      </div>
+    </article>
+  </div>
+</section>
+
+<div
+  class="self-collection-qr__modal"
+  *ngIf="selectedRequest as request"
+  role="dialog"
+  aria-modal="true"
+  [attr.aria-label]="config.imageAlt + ' for ' + request.title"
+  (click)="closeQr()"
+>
+  <div class="self-collection-qr__modal-panel" (click)="$event.stopPropagation()">
+    <button class="self-collection-qr__modal-close" type="button" aria-label="Close QR code" (click)="closeQr()">
+      &times;
+    </button>
+    <img class="self-collection-qr__modal-image" [src]="request.qrUrl" [alt]="config.imageAlt + ' for ' + request.title" />
+    <h2>{{ request.title }}</h2>
+  </div>
+</div>
