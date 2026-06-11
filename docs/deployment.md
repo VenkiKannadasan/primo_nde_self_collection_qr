@@ -52,7 +52,7 @@ For production locker QR codes:
 
 Before production activation:
 
-1. Confirm the NDE hook selector `nde-requests-after` renders in the Requests tab.
+1. Confirm the NDE hook selector `nde-requests` or `nde-requests-after` renders in the Requests tab.
 2. Confirm ready requests expose a request ID through the host component or expanded row.
 3. Confirm placeholder QR mode renders only for `On Hold Shelf` requests.
 4. Confirm production locker mode returns a valid QR for a request that exists in the locker system.

@@ -29,7 +29,7 @@ Keep locker service secrets in Alma add-on configuration, not in source control.
 }
 ```
 
-If the NDE Requests customization hook differs in a tenant, update `REQUESTS_TAB_SELECTOR` in `src/app/custom1-module/customComponentMappings.ts`.
+If the NDE Requests customization hook differs in a tenant, update `REQUESTS_TAB_SELECTORS` in `src/app/custom1-module/customComponentMappings.ts`.
 
 If the NDE request row markup differs, keep the add-on hook as-is and override `rowSelector` in Alma parameters with a selector that matches one request row.
 

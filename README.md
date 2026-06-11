@@ -22,7 +22,7 @@ Preferred deployment matches the PayNow hosted add-on model:
 - Add-on name: `primo_nde_self_collection_qr`
 - Add-on URL: `https://venkikannadasan.github.io/primo_nde_self_collection_qr/`
 
-The current Requests hook is isolated in `src/app/custom1-module/customComponentMappings.ts` as `REQUESTS_TAB_SELECTOR`. If Ex Libris exposes a different Requests-tab selector in the tenant, update that constant.
+The Requests hooks are isolated in `src/app/custom1-module/customComponentMappings.ts` as `REQUESTS_TAB_SELECTORS`. The add-on currently registers both `nde-requests` and `nde-requests-after` because Alma/NDE may report the Requests add-on target as the base `nde-requests` component.
 
 For more setup notes, see `docs/self-collection-qr-addon.md` and `docs/deployment.md`.
 
